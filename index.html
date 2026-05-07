@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DRAMA-BRAWL: HEX-EVOLUTION V2</title>
+<!-- Google Search Console Verifications -->
+    <meta name="google-site-verification" content="VvxLbuNa69I8RuX_JZBe62c64G6Zw5R84J-RY-a3krs" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Bangers&display=swap');
+
+        :root {
+            --cyan: #00f2ff;
+            --gold: #ffcc00;
+            --glitch: #ff00ff;
+            --enemy: #ff4444;
+            --xp-color: #4ade80;
+        }
+
+        body {
+            background-color: #050505;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            width: 100vw;
+            height: 100dvh;
+        }
+
+        .brawl-font { font-family: 'Bangers', cursive; letter-spacing: 2px; }
+
+        /* Efectos de Personaje */
+        #hex-entity, #main-brawler {
+            transition: transform 0.1s ease-out, filter 0.3s;
+            transform-style: preserve-3d;
+        }
+
+        .rarity-basico { color: var(--cyan); filter: drop-shadow(0 0 15px var(--cyan)); }
+        .rarity-gold { color: var(--gold); filter: drop-shadow(0 0 25px var(--gold)); }
+        .rarity-glitch { color: var(--glitch); filter: drop-shadow(0 0 20px var(--glitch)); animation: glitch-anim 0.2s infinite; }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0); opacity: 1; }
+            20% { transform: translate(-2px, 2px); opacity: 0.8; }
+            40% { transform: translate(2px, -2px); opacity: 1; }
+            100% { transform: translate(0); }
+        }
+
+        #arena-canvas {
+            display: none;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #111827 0%, #050505 100%);
+            cursor: crosshair;
+        }
+
+        .xp-bar-container {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .xp-fill {
+            height: 100%;
+            background: var(--xp-color);
+            box-shadow: 0 0 10px var(--xp-color);
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .deploy-card {
+            pointer-events: auto;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .deploy-card.selected {
+            border-color: white !important;
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 10px 20px rgba(255,255,255,0.2);
+        }
+        .deploy-card.disabled { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+
+        .rocket-btn {
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            border: 2px solid #fff;
+            animation: pulse-rocket 1.5s infinite;
+        }
+        @keyframes pulse-rocket {
+            0% { transform: scale(1); box-shadow: 0 0 0px #ef4444; }
+            50% { transform: scale(1.1); box-shadow: 0 0 20px #ef4444; }
+            100% { transform: scale(1); box-shadow: 0 0 0px #ef4444; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="white-flash" class="fixed inset-0 bg-white opacity-0 pointer-events-none z-[100] transition-opacity duration-300"></div>
+
+    <!-- PANTALLA 1: CARGA (2 CLICS) -->
+    <div id="hook-screen" class="fixed inset-0 flex flex-col items-center justify-center z-50 bg-black p-6">
+        <div class="text-center mb-8">
+            <h2 class="brawl-font text-2xl text-white/40 uppercase tracking-widest">Iniciando Protocolo Hex</h2>
+            <div id="hook-counter" class="text-9xl brawl-font text-cyan-400 drop-shadow-[0_0_30px_rgba(0,242,255,0.5)]">2</div>
+        </div>
+        
+        <div class="cursor-pointer active:scale-95 transition-transform" onclick="handleHookClick()">
+            <div id="hex-entity" class="w-64 h-64 rarity-basico">
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+                    <path d="M50 5 L89 27.5 V72.5 L50 95 L11 72.5 V27.5 L50 5Z" stroke="currentColor" stroke-width="4" />
+                    <path d="M38 35 H52 C60 35 65 40 65 50 C65 60 60 65 52 65 H38 V35ZM44 41 V59 H50 C55 59 58 56 58 50 C58 44 55 41 50 41 H44Z" fill="currentColor" />
+                </svg>
+            </div>
+        </div>
+        <p class="mt-12 text-cyan-400/60 animate-pulse brawl-font text-xl">PRESIONA EL NÚCLEO</p>
+    </div>
+
+    <!-- PANTALLA 2: LOBBY -->
+    <div id="lobby-screen" class="hidden fixed inset-0 z-20 flex flex-col justify-between bg-[#050505]">
+        <!-- Barra Superior -->
+        <div class="p-4 flex flex-col gap-2 bg-black/40 backdrop-blur-md">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 text-yellow-400">
+                        <svg viewBox="0 0 100 100" fill="none"><path d="M50 5 L89 27.5 V72.5 L50 95 L11 72.5 V27.5 L50 5Z" stroke="currentColor" stroke-width="8"/><path d="M38 35 H52 C60 35 65 40 65 50 C65 60 60 65 52 65 H38 V35ZM44 41 V59 H50 C55 59 58 56 58 50 C58 44 55 41 50 41 H44Z" fill="currentColor" /></svg>
+                    </div>
+                    <div>
+                        <span class="text-2xl brawl-font text-yellow-400" id="gem-count">0</span>
+                        <p class="text-[10px] text-white/40 font-bold uppercase">Gemas Hex</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-xl brawl-font text-green-400" id="level-display">NIVEL 1</span>
+                    <div class="xp-bar-container w-32 mt-1">
+                        <div id="xp-fill" class="xp-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lore AI -->
+        <div class="px-4 mt-2">
+            <div id="lore-container" class="lore-box p-3 rounded-xl border-l-4 border-cyan-400 bg-cyan-900/10">
+                <p id="lore-text" class="text-[11px] italic text-cyan-100/80 leading-tight">Accediendo a la red neuronal...</p>
+            </div>
+        </div>
+
+        <!-- Brawler / Shop -->
+        <div class="flex-1 flex flex-col items-center justify-center p-4 relative">
+            <h1 id="evolution-name" class="text-4xl md:text-6xl brawl-font mb-4 text-white drop-shadow-2xl uppercase">HEX-BÁSICO</h1>
+            <div id="main-brawler" class="w-64 h-64 md:w-80 md:h-80 rarity-basico cursor-pointer active:scale-95 transition-transform" onclick="handleMainClick()">
+                <svg viewBox="0 0 100 100" fill="none" class="w-full h-full">
+                    <path d="M50 5 L89 27.5 V72.5 L50 95 L11 72.5 V27.5 L50 5Z" stroke="currentColor" stroke-width="4" />
+                    <path d="M38 35 H52 C60 35 65 40 65 50 C65 60 60 65 52 65 H38 V35ZM44 41 V59 H50 C55 59 58 56 58 50 C58 44 55 41 50 41 H44Z" fill="currentColor" />
+                </svg>
+            </div>
+            
+            <!-- Rocket Unlock Shop -->
+            <div id="rocket-shop" class="mt-8">
+                <button id="buy-rocket-btn" onclick="buyRocket()" class="bg-zinc-800 border-2 border-orange-500/50 px-6 py-2 rounded-full text-xs brawl-font text-orange-400 hover:bg-orange-500/20 transition-all">
+                    DESBLOQUEAR COHETE RAYO (5,000 💎)
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-6 flex flex-col gap-4">
+            <div class="flex gap-4 max-w-2xl mx-auto w-full">
+                <button onclick="changeRarity()" class="flex-1 bg-zinc-800 border-b-4 border-black p-4 rounded-2xl brawl-font text-xl active:translate-y-1 shadow-lg">SKINS</button>
+                <button onclick="startBattle()" class="flex-[2] bg-gradient-to-b from-red-500 to-red-700 border-b-4 border-red-900 p-4 rounded-2xl brawl-font text-4xl italic shadow-[0_0_30px_rgba(239,68,68,0.3)] active:translate-y-1">¡BATALLA!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ARENA -->
+    <canvas id="arena-canvas" onclick="handleCanvasClick(event)"></canvas>
+    
+    <!-- UI BATALLA -->
+    <div id="battle-ui" class="hidden fixed inset-0 z-30 flex flex-col justify-between p-4 pointer-events-none">
+        <!-- Top Stats -->
+        <div class="flex justify-between items-center bg-black/60 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+            <div class="flex-1 flex flex-col gap-1">
+                <div id="player-base-hp" class="h-4 bg-cyan-500 w-full rounded-full transition-all border border-black shadow-[0_0_10px_rgba(0,242,255,0.3)]"></div>
+                <span class="text-[8px] brawl-font text-cyan-400">TU NEXO</span>
+            </div>
+            <div class="px-6 brawl-font text-2xl italic text-white italic">VS</div>
+            <div class="flex-1 flex flex-col gap-1 text-right">
+                <div id="enemy-base-hp" class="h-4 bg-red-500 w-full rounded-full transition-all border border-black shadow-[0_0_10px_rgba(239,68,68,0.3)]"></div>
+                <span class="text-[8px] brawl-font text-red-500">ENEMIGO</span>
+            </div>
+        </div>
+
+        <div id="battle-instructions" class="text-center text-white/40 brawl-font text-xs animate-pulse">Toca en el campo para desplegar</div>
+
+        <!-- Controls -->
+        <div class="w-full max-w-md mx-auto space-y-4">
+            <div class="flex justify-between items-end px-4">
+                <span class="brawl-font text-purple-400">ENERGÍA</span>
+                <span id="energy-text" class="text-3xl brawl-font text-white italic">0</span>
+            </div>
+            <div class="h-5 bg-gray-900 rounded-full border-2 border-black overflow-hidden shadow-inner">
+                <div id="energy-fill" class="h-full bg-gradient-to-r from-purple-600 via-pink-500 to-purple-400 w-0"></div>
+            </div>
+            <div class="flex justify-center gap-2 pointer-events-auto">
+                <div onclick="selectCard(0)" id="card-0" class="deploy-card flex-1 bg-zinc-900 border-2 border-cyan-400 p-2 rounded-xl text-center">
+                    <div class="w-8 h-8 mx-auto text-cyan-400"><svg viewBox="0 0 100 100" fill="none"><path d="M50 5 L89 27.5 V72.5 L50 95 L11 72.5 V27.5 L50 5Z" stroke="currentColor" stroke-width="10"/></svg></div>
+                    <p class="text-[9px] brawl-font mt-1">VELOZ</p>
+                    <p class="text-sm text-purple-400">2⚡</p>
+                </div>
+                <div onclick="selectCard(1)" id="card-1" class="deploy-card flex-1 bg-zinc-900 border-2 border-yellow-400 p-2 rounded-xl text-center">
+                    <div class="w-8 h-8 mx-auto text-yellow-400"><svg viewBox="0 0 100 100" fill="none"><path d="M50 5 L89 27.5 V72.5 L50 95 L11 72.5 V27.5 L50 5Z" stroke="currentColor" stroke-width="10"/></svg></div>
+                    <p class="text-[9px] brawl-font mt-1">PESADO</p>
+                    <p class="text-sm text-purple-400">4⚡</p>
+                </div>
+                <div onclick="selectCard(2)" id="card-2" class="deploy-card flex-1 bg-zinc-900 border-2 border-purple-400 p-2 rounded-xl text-center">
+                    <div class="w-8 h-8 mx-auto text-purple-400"><svg viewBox="0 0 100 100" fill="none"><path d="M50 5 L89 27.5 V72.5 L50 95 L11 72.5 V27.5 L50 5Z" stroke="currentColor" stroke-width="10"/></svg></div>
+                    <p class="text-[9px] brawl-font mt-1">GLITCH</p>
+                    <p class="text-sm text-purple-400">3⚡</p>
+                </div>
+                <!-- Rocket Card -->
+                <div onclick="selectCard(3)" id="card-3" class="hidden deploy-card flex-1 bg-zinc-900 border-2 border-orange-500 p-2 rounded-xl text-center rocket-btn">
+                    <div class="w-8 h-8 mx-auto text-white">🚀</div>
+                    <p class="text-[9px] brawl-font mt-1">RAYO</p>
+                    <p class="text-sm text-white">5⚡</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALES -->
+    <div id="ai-modal" class="hidden fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+        <div class="bg-zinc-900 border-2 border-cyan-500 w-full max-w-sm rounded-[2rem] p-8 shadow-[0_0_60px_rgba(0,242,255,0.2)] text-center">
+            <h3 class="brawl-font text-3xl text-cyan-400 mb-4" id="modal-title">SISTEMA</h3>
+            <p id="modal-body" class="text-sm text-gray-300 leading-relaxed mb-8 italic"></p>
+            <button onclick="closeModal()" class="w-full bg-cyan-600 p-4 rounded-2xl brawl-font text-2xl shadow-lg active:scale-95 transition-transform">CONTINUAR</button>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = "";
+        const modelName = "gemini-2.5-flash-preview-09-2025";
+        
+        let state = 'HOOK';
+        let clicksToBigBang = 2; 
+        let gems = 0;
+        let level = 1;
+        let xp = 0;
+        let rarityIndex = 0;
+        let hasRocket = false;
+        let selectedCardIdx = 0;
+
+        const levelThemes = [
+            { primary: '#00f2ff', secondary: '#1e3a8a' }, // Lv 1
+            { primary: '#4ade80', secondary: '#166534' }, // Lv 2
+            { primary: '#f472b6', secondary: '#831843' }, // Lv 3
+            { primary: '#fbbf24', secondary: '#78350f' }, // Lv 4+
+        ];
+
+        let energy = 0;
+        let playerHP = 1000;
+        let enemyHP = 1000;
+        let units = [];
+        let projectiles = [];
+        let explosions = [];
+        let lastTime = 0;
+        let spawnInt;
+
+        const canvas = document.getElementById('arena-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- GEMINI ---
+        async function fetchGemini(prompt, sys = "") {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: { parts: [{ text: sys }] }
+                    })
+                });
+                const d = await res.json();
+                return d.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (e) { return "Error de red IA."; }
+        }
+
+        async function generateLore() {
+            const lore = await fetchGemini(`Crea un reporte táctico corto (10 palabras) para un brawler de nivel ${level}.`, "Comandante Hex.");
+            document.getElementById('lore-text').innerText = lore || "Nexo operativo.";
+        }
+
+        async function suggestSkin() {
+            showModal("GENERADOR IA", "Analizando estética de nivel " + level + "...");
+            const idea = await fetchGemini(`Diseña una skin basada en el color ${levelThemes[Math.min(level-1, 3)].primary} para mi brawler hexagonal.`, "Artista de Skins.");
+            showModal("CONCEPTO NUEVO", idea);
+        }
+
+        // --- GAMEPLAY LOBBY ---
+        function handleHookClick() {
+            if (state !== 'HOOK') return;
+            clicksToBigBang--;
+            document.getElementById('hook-counter').innerText = clicksToBigBang;
+            if (clicksToBigBang <= 0) {
+                state = 'LOBBY';
+                document.getElementById('white-flash').style.opacity = '1';
+                setTimeout(() => {
+                    document.getElementById('hook-screen').classList.add('hidden');
+                    document.getElementById('lobby-screen').classList.remove('hidden');
+                    document.getElementById('white-flash').style.opacity = '0';
+                    generateLore();
+                }, 300);
+            }
+        }
+
+        function handleMainClick() {
+            const b = document.getElementById('main-brawler');
+            b.style.transform = 'rotateX(360deg) scale(1.1)';
+            setTimeout(() => b.style.transform = 'rotateX(0deg) scale(1)', 300);
+            gems += 5;
+            updateUI();
+        }
+
+        function buyRocket() {
+            if (gems >= 5000 && !hasRocket) {
+                gems -= 5000;
+                hasRocket = true;
+                document.getElementById('rocket-shop').classList.add('hidden');
+                document.getElementById('card-3').classList.remove('hidden');
+                showModal("¡DESBLOQUEADO!", "Has obtenido el Cohete de Rayos. Selecciónalo en batalla para sembrar el caos.");
+                updateUI();
+            } else if (gems < 5000) {
+                showModal("SISTEMA", "Necesitas 5,000 gemas para esta tecnología.");
+            }
+        }
+
+        function changeRarity() {
+            rarityIndex = (rarityIndex + 1) % 3;
+            const rarities = ['rarity-basico', 'rarity-gold', 'rarity-glitch'];
+            const names = ['HEX-BÁSICO', 'DRAMA-GOLD', 'GLITCH-HEX'];
+            const b = document.getElementById('main-brawler');
+            b.className = `w-64 h-64 md:w-80 md:h-80 cursor-pointer active:scale-95 transition-transform ${rarities[rarityIndex]}`;
+            document.getElementById('evolution-name').innerText = names[rarityIndex];
+            generateLore();
+        }
+
+        function updateUI() {
+            document.getElementById('gem-count').innerText = gems.toLocaleString();
+            document.getElementById('level-display').innerText = `NIVEL ${level}`;
+            document.getElementById('xp-fill').style.width = `${xp}%`;
+            if (hasRocket) document.getElementById('rocket-shop').classList.add('hidden');
+        }
+
+        // --- BATTLE ENGINE ---
+        function startBattle() {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('battle-ui').classList.remove('hidden');
+            canvas.style.display = 'block';
+            state = 'BATTLE';
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            playerHP = 1000; enemyHP = 1000; energy = 0;
+            units = []; projectiles = []; explosions = [];
+            selectCard(0);
+            lastTime = performance.now();
+            requestAnimationFrame(battleLoop);
+            spawnEnemy();
+        }
+
+        function selectCard(idx) {
+            selectedCardIdx = idx;
+            document.querySelectorAll('.deploy-card').forEach((c, i) => {
+                if(i === idx) c.classList.add('selected');
+                else c.classList.remove('selected');
+            });
+        }
+
+        const unitStats = [
+            { id: 0, cost: 2, hp: 130, speed: 2.5, range: 40, damage: 15, color: '#00f2ff' },
+            { id: 1, cost: 4, hp: 450, speed: 1.1, range: 35, damage: 10, color: '#ffcc00' },
+            { id: 2, cost: 3, hp: 90, speed: 1.8, range: 220, damage: 22, color: '#ff00ff' },
+            { id: 3, cost: 5, hp: 1, speed: 5, range: 10, damage: 200, color: '#f97316' } // Cohete
+        ];
+
+        function handleCanvasClick(e) {
+            if (state !== 'BATTLE') return;
+            const stats = unitStats[selectedCardIdx];
+            if (energy >= stats.cost) {
+                energy -= stats.cost;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                if (selectedCardIdx === 3) { // Lanzar Cohete
+                    projectiles.push({ x: canvas.width/2, y: canvas.height-50, tx: x, ty: y, team: 'player', type: 'rocket', damage: stats.damage });
+                } else {
+                    units.push({ ...stats, x, y, team: 'player', lastAtk: 0, color: levelThemes[Math.min(level-1, 3)].primary });
+                }
+            }
+        }
+
+        function spawnEnemy() {
+            if (state !== 'BATTLE') return;
+            const s = unitStats[Math.floor(Math.random()*3)];
+            const laneX = Math.random() > 0.5 ? canvas.width * 0.2 : canvas.width * 0.8;
+            units.push({ ...s, x: laneX, y: 100, team: 'enemy', color: '#ff4444', lastAtk: 0 });
+            spawnInt = setTimeout(spawnEnemy, Math.max(1500, 4000 - level*500));
+        }
+
+        function battleLoop(ts) {
+            if (state !== 'BATTLE') return;
+            const dt = ts - lastTime;
+            lastTime = ts;
+
+            energy = Math.min(10, energy + 0.02);
+            document.getElementById('energy-fill').style.width = (energy * 10) + '%';
+            document.getElementById('energy-text').innerText = Math.floor(energy);
+
+            unitStats.forEach((s, i) => {
+                const card = document.getElementById(`card-${i}`);
+                if (card) {
+                    if (energy >= s.cost) card.classList.remove('disabled');
+                    else card.classList.add('disabled');
+                }
+            });
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Bases
+            const theme = levelThemes[Math.min(level-1, 3)];
+            drawBase(canvas.width/2, canvas.height - 60, theme.primary, playerHP);
+            drawBase(canvas.width/2, 60, '#ff4444', enemyHP);
+
+            // Unidades
+            for (let i = units.length - 1; i >= 0; i--) {
+                const u = units[i];
+                let targetY = u.team === 'player' ? 60 : canvas.height - 60;
+                
+                let found = null;
+                for (const other of units) {
+                    if (other.team !== u.team && Math.hypot(other.x - u.x, other.y - u.y) < u.range) {
+                        found = other; break;
+                    }
+                }
+
+                if (found) {
+                    if (ts - u.lastAtk > 1000) {
+                        if (u.id === 2) projectiles.push({ x: u.x, y: u.y, tx: found.x, ty: found.y, team: u.team, type: 'bullet', damage: u.damage });
+                        else found.hp -= u.damage;
+                        u.lastAtk = ts;
+                    }
+                } else {
+                    if (Math.abs(targetY - u.y) < u.range) {
+                        if (ts - u.lastAtk > 1000) {
+                            if (u.team === 'player') enemyHP -= u.damage; else playerHP -= u.damage;
+                            u.lastAtk = ts;
+                        }
+                    } else {
+                        u.y += (u.team === 'player' ? -u.speed : u.speed);
+                    }
+                }
+
+                drawUnit(u);
+                if (u.hp <= 0) units.splice(i, 1);
+            }
+
+            // Proyectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                if (p.type === 'rocket') {
+                    const dx = p.tx - p.x; const dy = p.ty - p.y;
+                    const d = Math.hypot(dx, dy);
+                    if (d < 10) {
+                        createExplosion(p.tx, p.ty);
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+                    p.x += (dx/d) * 8; p.y += (dy/d) * 8;
+                } else {
+                    p.y += (p.team === 'player' ? -10 : 10);
+                }
+
+                ctx.fillStyle = p.team === 'player' ? (p.type==='rocket'?'#f97316':'#ff00ff') : '#ff4444';
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.type==='rocket'?6:3, 0, Math.PI*2); ctx.fill();
+                
+                if (p.type !== 'rocket') {
+                    for (const u of units) {
+                        if (u.team !== p.team && Math.hypot(p.x - u.x, p.y - u.y) < 25) {
+                            u.hp -= p.damage; projectiles.splice(i, 1); break;
+                        }
+                    }
+                }
+                if (p.y < 0 || p.y > canvas.height) projectiles.splice(i, 1);
+            }
+
+            // Explosiones Rayo
+            explosions.forEach((ex, idx) => {
+                ex.r += 4; ex.alpha -= 0.02;
+                ctx.save();
+                ctx.strokeStyle = `rgba(255, 255, 0, ${ex.alpha})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI*2); ctx.stroke();
+                // Rayos visuales
+                for(let j=0; j<8; j++) {
+                    ctx.beginPath(); ctx.moveTo(ex.x, ex.y);
+                    const ang = (j/8)*Math.PI*2 + ts*0.01;
+                    ctx.lineTo(ex.x + Math.cos(ang)*ex.r*1.5, ex.y + Math.sin(ang)*ex.r*1.5);
+                    ctx.stroke();
+                }
+                ctx.restore();
+                
+                // Daño de área
+                units.forEach(u => {
+                    if (u.team === 'enemy' && Math.hypot(ex.x - u.x, ex.y - u.y) < ex.r) {
+                        u.hp -= 2; // Daño constante por rayo
+                    }
+                });
+
+                if (ex.alpha <= 0) explosions.splice(idx, 1);
+            });
+
+            document.getElementById('player-base-hp').style.width = (playerHP/10) + '%';
+            document.getElementById('enemy-base-hp').style.width = (enemyHP/10) + '%';
+
+            if (enemyHP <= 0 || playerHP <= 0) endGame(enemyHP <= 0);
+            else requestAnimationFrame(battleLoop);
+        }
+
+        function createExplosion(x, y) {
+            explosions.push({ x, y, r: 10, alpha: 1 });
+        }
+
+        function endGame(win) {
+            state = 'LOBBY';
+            clearTimeout(spawnInt);
+            canvas.style.display = 'none';
+            document.getElementById('battle-ui').classList.add('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+            
+            if (win) {
+                gems += 1500; xp += 40;
+                if (xp >= 100) { xp = 0; level++; showModal("¡NIVEL UP!", `Has alcanzado el nivel ${level}. ¡Nuevos colores desbloqueados!`); }
+                showModal("VICTORIA", "Base enemiga eliminada. +1500 gemas.");
+            } else {
+                gems += 200; showModal("DERROTA", "Tu nexo ha caído. +200 gemas.");
+            }
+            updateUI();
+        }
+
+        function drawBase(x, y, color, hp) {
+            ctx.save();
+            ctx.strokeStyle = color; ctx.lineWidth = 5;
+            ctx.shadowBlur = 20; ctx.shadowColor = color;
+            ctx.beginPath(); ctx.arc(x, y, 45, 0, Math.PI*2); ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawUnit(u) {
+            ctx.save();
+            ctx.strokeStyle = u.color; ctx.lineWidth = 3;
+            const size = u.id === 1 ? 24 : 15;
+            ctx.beginPath();
+            for(let i=0; i<6; i++) ctx.lineTo(u.x + size*Math.cos(i*Math.PI/3), u.y + size*Math.sin(i*Math.PI/3));
+            ctx.closePath(); ctx.stroke();
+            ctx.restore();
+        }
+
+        function showModal(t, b) {
+            document.getElementById('modal-title').innerText = t;
+            document.getElementById('modal-body').innerText = b;
+            document.getElementById('ai-modal').classList.remove('hidden');
+        }
+        function closeModal() { document.getElementById('ai-modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
